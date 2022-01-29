@@ -1,0 +1,13 @@
+{
+	"name": "test_node",
+	"version": "1.0.0",
+	"description": "Test chaincode implemented in node.js",
+	"scripts": {
+		"start": "node test_cc.js"
+	},
+	"engine-strict": true,
+	"license": "Apache-2.0",
+	"dependencies": {
+		"fabric-shim": "^2.2.1"
+	}
+}

@@ -1,0 +1,238 @@
+version: '3.2'
+
+services:
+  orderer0.orderer.com:
+    container_name: orderer0.orderer.com
+    image: hyperledger/fabric-orderer:2.3
+    environment:
+      - CONFIGTX_ORDERER_ORDERERTYPE=etcdraft
+      - ORDERER_GENERAL_LOGLEVEL=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/genesis.block
+      - ORDERER_GENERAL_LOCALMSPID=MainOrgOrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_RAMLEDGER_HISTORY_SIZE=100
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
+    ports:
+      - 7050:7050
+    volumes:
+        - type: bind
+          source: ./devchannel/channels/genesis.block
+          target: /var/hyperledger/orderer/genesis.block
+        - type: bind
+          source: ./devchannel/crypto-config/ordererOrganizations/orderer.com/orderers/orderer0.orderer.com/msp
+          target: /var/hyperledger/orderer/msp
+        - type: bind
+          source: ./devchannel/crypto-config/ordererOrganizations/orderer.com/orderers/orderer0.orderer.com/tls
+          target: /var/hyperledger/orderer/tls
+
+  peer0.main.org.com:
+    container_name: peer0.main.org.com
+    image: hyperledger/fabric-peer:2.3
+    environment:
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_PEER_ID=peer0.main.org.com
+      - CORE_PEER_NETWORKID=dev
+      - CORE_LOGGING_LEVEL=INFO
+      ## the following setting redirects chaincode container logs to the peer container logs
+      - CORE_VM_DOCKER_ATTACHSTDOUT=true
+      - CORE_PEER_LOCALMSPID=MainOrgMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_ADDRESS=peer0.main.org.com:7051
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb0.main.org.com:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+      # # the following setting starts chaincode containers on the same
+      # # bridge network as the peers
+      # # https://docs.docker.com/compose/networking/
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=network_default
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: peer node start
+    ports:
+      - 7051:7051
+      - 7053:7053
+    volumes:
+      - type: bind
+        source: /var/run/
+        target: /host/var/run/
+      - type: bind
+        source: ./devchannel/crypto-config/peerOrganizations/main.org.com/peers/peer0.main.org.com/msp
+        target: /etc/hyperledger/fabric/msp
+      - type: bind
+        source: ./devchannel/crypto-config/peerOrganizations/main.org.com/peers/peer0.main.org.com/tls
+        target: /etc/hyperledger/fabric/tls
+    depends_on:
+      - orderer0.orderer.com
+      - couchdb0.main.org.com
+
+  peer0.org1.org.com:
+    container_name: peer0.org1.org.com
+    image: hyperledger/fabric-peer:2.3
+    environment:
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_PEER_ID=peer0.org1.org.com
+      - CORE_PEER_NETWORKID=dev
+      - CORE_PEER_LOCALMSPID=Org1MSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_ADDRESS=peer0.org1.org.com:8051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:8051
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:8052
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb0.org1.org.com:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+      # # the following setting starts chaincode containers on the same
+      # # bridge network as the peers
+      # # https://docs.docker.com/compose/networking/
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=network_default
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
+    command: peer node start
+    ports:
+      - 8051:8051
+      - 8052:8052
+      - 8053:7053
+    volumes:
+      - type: bind
+        source: /var/run/
+        target: /host/var/run/
+      - type: bind
+        source: ./devchannel/crypto-config/peerOrganizations/org1.org.com/peers/peer0.org1.org.com/msp
+        target: /etc/hyperledger/fabric/msp
+      - type: bind
+        source: ./devchannel/crypto-config/peerOrganizations/org1.org.com/peers/peer0.org1.org.com/tls
+        target: /etc/hyperledger/fabric/tls
+    depends_on:
+      - orderer0.orderer.com
+      - couchdb0.org1.org.com
+
+  peer0.org2.org.com:
+    container_name: peer0.org2.org.com
+    image: hyperledger/fabric-peer:2.3
+    environment:
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_PEER_ID=peer0.org2.org.com
+      - CORE_PEER_NETWORKID=dev
+      - CORE_PEER_LOCALMSPID=Org2MSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_ADDRESS=peer0.org2.org.com:9051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb0.org2.org.com:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+      # # the following setting starts chaincode containers on the same
+      # # bridge network as the peers
+      # # https://docs.docker.com/compose/networking/
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=network_default
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
+    command: peer node start
+    ports:
+      - 9051:9051
+      - 9052:9052
+      - 9053:7053
+    volumes:
+      - type: bind
+        source: /var/run/
+        target: /host/var/run/
+      - type: bind
+        source: ./devchannel/crypto-config/peerOrganizations/org2.org.com/peers/peer0.org2.org.com/msp
+        target: /etc/hyperledger/fabric/msp
+      - type: bind
+        source: ./devchannel/crypto-config/peerOrganizations/org2.org.com/peers/peer0.org2.org.com/tls
+        target: /etc/hyperledger/fabric/tls
+    depends_on:
+      - orderer0.orderer.com
+      - couchdb0.org2.org.com
+
+  couchdb0.main.org.com:
+    container_name: couchdb0.main.org.com
+    image: couchdb:3.1
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    # Comment/Uncomment the port mapping if you want to hide/expose the CouchDB service,
+    # for example map it to utilize Fauxton User Interface in dev environments.
+    ports:
+      - "5984:5984"
+  couchdb0.org1.org.com:
+    container_name: couchdb0.org1.org.com
+    image: couchdb:3.1
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    # Comment/Uncomment the port mapping if you want to hide/expose the CouchDB service,
+    # for example map it to utilize Fauxton User Interface in dev environments.
+    ports:
+      - "6984:5984"
+  couchdb0.org2.org.com:
+    container_name: couchdb0.org2.org.com
+    image: couchdb:3.1
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    # Comment/Uncomment the port mapping if you want to hide/expose the CouchDB service,
+    # for example map it to utilize Fauxton User Interface in dev environments.
+    ports:
+      - "7984:5984"
+
+  explorerdb:
+    image: hyperledger/explorer-db:latest
+    container_name: explorerdb
+    environment:
+      - DATABASE_DATABASE=fabricexplorer
+      - DATABASE_USERNAME=hppoc
+      - DATABASE_PASSWORD=password
+    healthcheck:
+      test: "pg_isready -h localhost -p 5432 -q -U postgres"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    #volumes:
+    #  - pgdata:/var/lib/postgresql/data
+
+  explorer:
+    image: hyperledger/explorer:latest
+    container_name: explorer
+    environment:
+      - DATABASE_HOST=explorerdb
+      - DATABASE_DATABASE=fabricexplorer
+      - DATABASE_USERNAME=hppoc
+      - DATABASE_PASSWD=password
+      - LOG_LEVEL_CONSOLE=info
+      - LOG_CONSOLE_STDOUT=true
+      - DISCOVERY_AS_LOCALHOST=false
+    volumes:
+      - type: bind
+        source: ../client/config/explorer-config.json
+        target: /opt/explorer/app/platform/fabric/config.json
+      - type: bind
+        source: ../client/config/explorer-network.json
+        target: /opt/explorer/app/platform/fabric/connection-profile/explorer-network.json
+      - type: bind
+        source: ./devchannel/crypto-config
+        target: /opt/network/devchannel/crypto-config
+      - ../walletstore:/opt/explorer/wallet
+    ports:
+      - 8080:8080
+    depends_on:
+      explorerdb:
+        condition: service_healthy
